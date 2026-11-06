@@ -1,0 +1,107 @@
+---
+import { getCollection } from "astro:content";
+import CategoryBrowser from "@/components/CategoryBrowser.astro";
+import HomeHero from "@/components/HomeHero.astro";
+import PostCard from "@/components/PostCard.astro";
+import SectionHeader from "@/components/SectionHeader.astro";
+import SiteFooter from "@/components/SiteFooter.astro";
+import SiteHeader from "@/components/SiteHeader.astro";
+import TopicsLine from "@/components/TopicsLine.astro";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { categories } from "@/config/categories";
+import { siteConfig } from "@/config/site";
+import { excludePosts, getEditorsPicks, getFeatured, getTrending, visiblePosts } from "@/lib/posts";
+
+const allPosts = visiblePosts(await getCollection("posts"));
+
+/*
+ * The front page is dealt from the top down: each block takes the next slice of
+ * the archive, so nothing repeats between them.
+ *
+ * Two blocks deliberately draw from the whole archive again, and each is a
+ * *criterion* rather than a position — the poster wall is "flagged in
+ * frontmatter", the browser is "by section". A story qualifying for one of
+ * those while also running further up the page is the right answer, not a
+ * duplicate.
+ */
+let pool = allPosts;
+
+/** Hands a block its posts and takes them out of circulation. */
+const take = <T extends typeof pool>(chosen: T) => {
+  pool = excludePosts(pool, chosen);
+  return chosen;
+};
+
+/** The slider: whatever is flagged `featured`, newest first, then the newest. */
+const slides = take(getFeatured(pool, 3));
+/** The column beside it. */
+const topStories = take(getTrending(pool, 5));
+/** The grid under the opening — the block that carries the page. */
+const latest = take(pool.slice(0, 9));
+/** A second grid, further down. */
+const more = take(pool.slice(0, 6));
+
+/** Flagged `editorsPick: true`; falls back to the newest stories. */
+const picks = getEditorsPicks(allPosts, 9);
+---
+
+<BaseLayout>
+  <SiteHeader posts={allPosts} />
+  <main id="content">
+    <h1 class="sr-only">{siteConfig.name} — {siteConfig.tagline}</h1>
+
+    <div class="container section section-top-sm">
+      <HomeHero slides={slides} top={topStories} topLabel="Top stories" />
+    </div>
+
+    {
+      latest.length > 0 && (
+        <section class="container section" aria-labelledby="home-latest">
+          <SectionHeader title="Just back from" href="/posts/" linkLabel="The whole archive" id="home-latest" align="center" />
+          <div class="grid-posts grid-posts--flush">
+            {latest.map((post, index) => (
+              <PostCard post={post} headingLevel="h3" eager={index < 3} />
+            ))}
+          </div>
+        </section>
+      )
+    }
+
+    <section class="container section" aria-labelledby="home-topics">
+      <h2 class="sr-only" id="home-topics">What Detour covers</h2>
+      <TopicsLine categories={categories} />
+    </section>
+
+    {
+      picks.length > 0 && (
+        <section class="container section" aria-labelledby="home-picks">
+          <SectionHeader title="Worth the detour" href="/posts/" linkLabel="Everything" id="home-picks" align="center" />
+          <div class="grid-posts grid-posts--flush">
+            {picks.map((post) => (
+              <PostCard post={post} variant="poster" headingLevel="h3" />
+            ))}
+          </div>
+        </section>
+      )
+    }
+
+    <section class="container section" aria-labelledby="home-browse">
+      <SectionHeader title="Stories by section" href="/posts/" linkLabel="All sections" id="home-browse" align="center" />
+      <CategoryBrowser categories={categories} posts={allPosts} limit={5} id="home-browse" />
+    </section>
+
+    {
+      more.length > 0 && (
+        <section class="container section" aria-labelledby="home-more">
+          <SectionHeader title="More to read" href="/posts/" linkLabel="The whole archive" id="home-more" align="center" />
+          <div class="grid-posts">
+            {more.map((post) => (
+              <PostCard post={post} headingLevel="h3" showExcerpt />
+            ))}
+          </div>
+        </section>
+      )
+    }
+  </main>
+  <SiteFooter />
+</BaseLayout>

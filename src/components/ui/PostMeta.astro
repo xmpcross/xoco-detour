@@ -1,0 +1,36 @@
+---
+import { formatDate, type Post } from "@/lib/posts";
+
+/**
+ * The one line of metadata an archive entry carries: the section and the date,
+ * on the same line, separated by a dot.
+ *
+ * They are together on purpose. Split across two lines — a section chip over
+ * the headline and a date under it — they read as two facts a reader has to
+ * collect; on one line under the headline they read as a filing note, which is
+ * what they are.
+ *
+ * There is no byline: the site publishes under one name, so printing it on
+ * every row says nothing a reader did not already know. It appears on the
+ * article and the author archive only.
+ */
+interface Props {
+  post: Post;
+  showCategory?: boolean;
+  class?: string;
+}
+
+const { post, showCategory = true, class: className = "" } = Astro.props;
+---
+
+<p class:list={["label txt-dim meta-line", className]}>
+  {
+    showCategory && (
+      <>
+        <span class="meta-line__section">{post.data.category}</span>
+        <span class="meta-line__dot" aria-hidden="true" />
+      </>
+    )
+  }
+  <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+</p>

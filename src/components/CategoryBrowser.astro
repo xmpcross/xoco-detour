@@ -1,0 +1,203 @@
+---
+import { Image } from "astro:assets";
+import PostMeta from "@/components/ui/PostMeta.astro";
+import { categoryMeta, categoryTints } from "@/config/categories";
+import { categorySlug, getByCategory, postHref, type Category, type Post } from "@/lib/posts";
+
+/**
+ * The sections, one at a time: the list of them down the left, and the section
+ * you picked as a tinted panel on the right — its newest story as a
+ * photograph, the three after it as rows.
+ *
+ * It is a tab set only once a script has run. The server renders every panel
+ * in order, each under its own heading, so with scripting off the block is a
+ * plain stack of sections and nothing is hidden behind a control that does not
+ * work. `upgrade()` is what turns the list into a `tablist` and the headings
+ * into screen-reader-only text.
+ *
+ * Each panel wears its section's tint — see `categoryTints`. It is the only
+ * colour on the front page that is not a photograph, which is what makes it
+ * read as a section marker rather than as decoration.
+ */
+interface Props {
+  categories: readonly Category[];
+  posts: Post[];
+  /** Stories in a panel, the first of them as the picture. */
+  limit?: number;
+  id?: string;
+}
+
+const { categories, posts, limit = 4, id = "browse" } = Astro.props;
+
+const panels = categories
+  .map((category) => ({
+    category,
+    slug: categorySlug(category),
+    tint: categoryTints[category],
+    blurb: categoryMeta[category].blurb,
+    stories: getByCategory(posts, category, limit),
+  }))
+  .filter((panel) => panel.stories.length > 0);
+---
+
+{
+  panels.length > 0 && (
+    <div class="browser reveal" data-browser>
+      <div class="browser__side">
+        <ul class="browser__tabs" data-browser-tabs>
+          {panels.map((panel, index) => (
+            <li>
+              <a
+                class="browser__tab"
+                href={`/category/${panel.slug}/`}
+                id={`${id}-tab-${panel.slug}`}
+                data-browser-tab={panel.slug}
+                data-selected={index === 0 ? "true" : "false"}
+              >
+                <span class="browser__tabName">{panel.category}</span>
+                <span class="browser__tabBlurb txt-xs txt-dim">{panel.blurb}</span>
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" class="browser__tabArrow">
+                  <path
+                    d="M5 12h14m-5-5 5 5-5 5"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div class="browser__panels">
+        {panels.map((panel, index) => {
+          const [lead, ...rest] = panel.stories;
+          return (
+            <section
+              class="browser__panel"
+              style={`--panel-tint: var(--tint-${panel.tint})`}
+              id={`${id}-panel-${panel.slug}`}
+              data-browser-panel={panel.slug}
+              data-selected={index === 0 ? "true" : "false"}
+            >
+              <h3 class="browser__panelName" data-browser-panel-name>
+                {panel.category}
+              </h3>
+
+              <a class="browser__lead zoom-host" href={postHref(lead)}>
+                <span class="browser__leadMedia">
+                  <Image
+                    src={lead.data.cover.src}
+                    alt=""
+                    widths={[400, 600, 800, 1100]}
+                    sizes="(min-width: 64rem) 26vw, (min-width: 40rem) 44vw, 88vw"
+                    loading={index === 0 ? "eager" : "lazy"}
+                    decoding="async"
+                  />
+                </span>
+                <span class="browser__leadBody">
+                  <span class="txt-h4 browser__leadTitle">{lead.data.title}</span>
+                  <span class="label browser__leadCue">Read the story</span>
+                </span>
+              </a>
+
+              {rest.length > 0 && (
+                <ol class="browser__list">
+                  {rest.map((post) => (
+                    <li class="browser__row">
+                      <a class="browser__rowLink" href={postHref(post)}>
+                        <span class="txt-h3 browser__rowTitle">{post.data.title}</span>
+                        <PostMeta post={post} class="browser__rowMeta" />
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              )}
+
+              <a class="section-link browser__more" href={`/category/${panel.slug}/`}>
+                See more in {panel.category}
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M7 17 17 7M9 7h8v8"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </a>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  )
+}
+
+<script>
+  document.querySelectorAll<HTMLElement>("[data-browser]").forEach((browser) => {
+    const list = browser.querySelector<HTMLElement>("[data-browser-tabs]");
+    const tabs = Array.from(browser.querySelectorAll<HTMLAnchorElement>("[data-browser-tab]"));
+    const panels = Array.from(browser.querySelectorAll<HTMLElement>("[data-browser-panel]"));
+    if (!list || tabs.length < 2 || panels.length !== tabs.length) return;
+
+    /* The markup is a list of links to section pages until this runs. Only
+       once the behaviour exists does it claim to be a tab set. */
+    list.setAttribute("role", "tablist");
+    list.setAttribute("aria-orientation", "vertical");
+    list.querySelectorAll("li").forEach((item) => item.setAttribute("role", "presentation"));
+    browser.dataset.tabbed = "true";
+
+    const select = (slug: string, focusTab: boolean) => {
+      tabs.forEach((tab) => {
+        const selected = tab.dataset.browserTab === slug;
+        tab.dataset.selected = String(selected);
+        tab.setAttribute("aria-selected", String(selected));
+        /* Roving tabindex: one stop for the whole set, then the arrow keys. */
+        tab.tabIndex = selected ? 0 : -1;
+        if (selected && focusTab) tab.focus();
+      });
+      panels.forEach((panel) => {
+        const selected = panel.dataset.browserPanel === slug;
+        panel.dataset.selected = String(selected);
+        panel.hidden = !selected;
+      });
+    };
+
+    tabs.forEach((tab, index) => {
+      const slug = tab.dataset.browserTab ?? "";
+      const panel = panels[index];
+
+      tab.setAttribute("role", "tab");
+      tab.setAttribute("aria-controls", panel.id);
+      panel.setAttribute("role", "tabpanel");
+      panel.setAttribute("aria-labelledby", tab.id);
+      panel.tabIndex = 0;
+      /* The panel's own heading would now repeat the tab that names it. */
+      panel.querySelector("[data-browser-panel-name]")?.classList.add("sr-only");
+
+      tab.addEventListener("click", (event) => {
+        event.preventDefault();
+        select(slug, false);
+      });
+
+      tab.addEventListener("keydown", (event) => {
+        const keys = ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"];
+        if (!keys.includes(event.key)) return;
+        event.preventDefault();
+        const forward = event.key === "ArrowDown" || event.key === "ArrowRight";
+        const target =
+          event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? tabs.length - 1
+              : (index + (forward ? 1 : -1) + tabs.length) % tabs.length;
+        select(tabs[target].dataset.browserTab ?? "", true);
+      });
+    });
+
+    select(tabs[0].dataset.browserTab ?? "", false);
+  });
+</script>

@@ -1,0 +1,66 @@
+---
+/**
+ * Every block opens the same way: a rule the width of the block, then the
+ * section name against a count and a way out of it. The rule is what makes a
+ * dense front page legible — eight blocks with no rules is one long scroll
+ * with no chapters, and eight boxed panels is a dashboard.
+ *
+ * Anything passed to the default slot joins the right-hand end, before the
+ * link. It is where a track's paging arrows go.
+ */
+interface Props {
+  title: string;
+  /** A mono count set against the name: "24 stories". */
+  count?: string;
+  /** One line under the name. Only the centred variant has room for it. */
+  lede?: string;
+  href?: string;
+  linkLabel?: string;
+  id?: string;
+  /** `center` sets the block on the page's axis — the track uses it. */
+  align?: "start" | "center";
+  class?: string;
+}
+
+const {
+  title,
+  count,
+  lede,
+  href,
+  linkLabel = "See all",
+  id,
+  align = "start",
+  class: className = "",
+} = Astro.props;
+---
+
+<div
+  class:list={["section-head", align === "center" && "section-head--center", className]}
+>
+  <div class="section-head__bar">
+    <h2 class="section-head__name" id={id}>{title}</h2>
+    {count && <span class="label txt-dim section-head__count">{count}</span>}
+
+    <div class="section-head__end">
+      <slot />
+      {
+        href && (
+          <a class="section-link" href={href}>
+            {linkLabel}
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M7 17 17 7M9 7h8v8"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </a>
+        )
+      }
+    </div>
+  </div>
+
+  {lede && <p class="txt-l txt-dim section-head__lede">{lede}</p>}
+</div>

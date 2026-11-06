@@ -1,0 +1,156 @@
+---
+import { searchItems, type SearchItem } from "@/lib/search";
+import type { Post } from "@/lib/posts";
+
+/**
+ * The client half of search, shared by the two surfaces that use it: the
+ * command palette in the header and the results page. Both read the same
+ * `/search-index.json` and rank it with the same function, so a story cannot
+ * place differently depending on where it was searched from.
+ *
+ * Rendered once per page by `SiteHeader`, ahead of every consumer.
+ */
+interface Props {
+  posts: Post[];
+  /** Seeds the palette so it answers before the index has been fetched. */
+  seedCount?: number;
+}
+
+const { posts, seedCount = 8 } = Astro.props;
+const seed: SearchItem[] = (await searchItems(posts)).slice(0, seedCount);
+---
+
+{/* Handed over as data rather than as `define:vars`, so the script below stays
+    a plain inline script that a type checker can read straight through. */}
+<script is:inline type="application/json" id="search-seed" set:html={JSON.stringify(seed)} />
+
+<script is:inline>
+  (() => {
+    const seed = JSON.parse(document.getElementById("search-seed")?.textContent || "[]");
+    let items = null;
+    let pending;
+
+    /**
+     * Fetched the first time someone reaches for search rather than on page
+     * load, so a reader who never searches never pays for it. A failed fetch
+     * falls back to the seed already in the page, so search degrades to the
+     * newest stories instead of to an error.
+     */
+    const load = () => {
+      if (items) return Promise.resolve(items);
+
+      pending ??= fetch("/search-index.json")
+        .then((response) => {
+          if (!response.ok) throw new Error("Search index unavailable");
+          return response.json();
+        })
+        .then((data) => (items = Array.isArray(data) && data.length ? data : seed))
+        .catch(() => (items = seed));
+
+      return pending;
+    };
+
+    const escapeHtml = (value) =>
+      String(value).replace(
+        /[&<>"']/g,
+        (character) =>
+          ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+          })[character],
+      );
+
+    const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    /* Matches a token at the start of any word, so "hot hat" reaches "Hot
+       Hatch" — the half-typed word a reader is still in the middle of. */
+    const startsWord = (text, token) =>
+      new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(token)}`, "u").test(text);
+
+    /**
+     * Lower is better, Infinity is no match. A headline hit always outranks a
+     * section or tag hit, which outranks a mention in the excerpt — so typing a
+     * title never buries it under stories that merely mention the word.
+     */
+    const rank = (item, query) => {
+      const tokens = query.split(/\s+/).filter(Boolean);
+      if (tokens.length === 0) return Number.POSITIVE_INFINITY;
+
+      const title = item.title.toLowerCase();
+      const taxonomy = `${item.category} ${(item.tags || []).join(" ")}`.toLowerCase();
+      const supporting = `${item.excerpt} ${item.author}`.toLowerCase();
+      const haystack = `${title} ${taxonomy} ${supporting}`;
+
+      // Every token has to land somewhere, so adding a word narrows the result
+      // set rather than widening it.
+      if (!tokens.every((token) => haystack.includes(token))) return Number.POSITIVE_INFINITY;
+
+      if (title.startsWith(query)) return 0;
+      if (tokens.every((token) => startsWord(title, token))) return 1;
+      if (title.includes(query)) return 2;
+      if (tokens.every((token) => taxonomy.includes(token))) return 3;
+      return 4;
+    };
+
+    const search = async (query) => {
+      const normalized = query.trim().toLowerCase();
+      if (!normalized) return [];
+
+      return (await load())
+        .map((item) => ({ item, rank: rank(item, normalized) }))
+        .filter((entry) => Number.isFinite(entry.rank))
+        .sort((a, b) => a.rank - b.rank)
+        .map((entry) => entry.item);
+    };
+
+    /*
+     * One archive entry, built in the browser. The results page, the reading
+     * list, and the archive filters all paint their rows with this, and it has
+     * to stay in step with `PostRow.astro`, which paints the same entry on the
+     * server.
+     */
+    const rowMarkup = (item) => {
+      const media = item.cover
+        ? `<div class="row__media"><img src="${escapeHtml(item.cover)}" alt="" width="720" height="480" loading="lazy" decoding="async" /></div>`
+        : "";
+
+      return `
+        <a class="row${item.cover ? "" : " row--flush"}" href="${escapeHtml(item.href)}">
+          ${media}
+          <div class="row__body">
+            <h2 class="txt-h2 row__title">${escapeHtml(item.title)}</h2>
+            <p class="txt-s txt-dim row__excerpt line-clamp-2">${escapeHtml(item.excerpt)}</p>
+            <p class="label txt-dim meta-line"><span class="meta-line__section">${escapeHtml(item.category)}</span><span class="meta-line__dot" aria-hidden="true"></span>${escapeHtml(item.date)}</p>
+          </div>
+        </a>
+      `;
+    };
+
+    /*
+     * One grid card, built in the browser. The reading list paints its grid
+     * with this, and it has to stay in step with the `card` variant of
+     * `PostCard.astro`, which paints the same card on the server.
+     */
+    const cardMarkup = (item) => {
+      const media = item.cover
+        ? `<div class="media media--wide"><img src="${escapeHtml(item.cover)}" alt="" width="720" height="480" loading="lazy" decoding="async" /></div>`
+        : "";
+
+      return `
+        <article class="card zoom-host">
+          ${media}
+          <a class="hit" href="${escapeHtml(item.href)}" aria-label="${escapeHtml(item.title)}"></a>
+          <div class="card__body">
+            <p class="label card__kicker">${escapeHtml(item.category)}</p>
+            <h2 class="txt-h3 card__title">${escapeHtml(item.title)}</h2>
+          </div>
+        </article>
+      `;
+    };
+
+    window.detourSearch = { load, search, rank, escapeHtml, rowMarkup, cardMarkup, seed };
+  })();
+</script>

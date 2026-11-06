@@ -1,0 +1,61 @@
+---
+import { Image } from "astro:assets";
+import PostMeta from "@/components/ui/PostMeta.astro";
+import { postHref, type Post } from "@/lib/posts";
+
+/**
+ * One entry of an archive: the cover on the left, the type on the right —
+ * headline, standfirst, then the section and date on one line under them. Two
+ * of these sit side by side on a desktop, so a page of twelve reads as six
+ * rows of pictures rather than as a ledger.
+ *
+ * The whole entry is one link rather than a headline link plus an overlay, so
+ * there is a single tab stop per story and no nested interactive elements.
+ * That is also why the section reads as a plain label here and not as the
+ * linked tag it is on a card.
+ */
+interface Props {
+  post: Post;
+  showExcerpt?: boolean;
+  /** Off where the block is already carrying pictures. */
+  showThumb?: boolean;
+  eager?: boolean;
+  headingLevel?: "h2" | "h3";
+  class?: string;
+}
+
+const {
+  post,
+  showExcerpt = true,
+  showThumb = true,
+  eager = false,
+  headingLevel = "h3",
+  class: className = "",
+} = Astro.props;
+
+const data = post.data;
+const Heading = headingLevel;
+---
+
+<a class:list={["row", "reveal", !showThumb && "row--flush", className]} href={postHref(post)}>
+  {
+    showThumb && (
+      <div class="row__media">
+        <Image
+          src={data.cover.src}
+          alt=""
+          widths={[360, 540, 720, 960]}
+          sizes="(min-width: 64rem) 22vw, (min-width: 40rem) 36vw, 42vw"
+          loading={eager ? "eager" : "lazy"}
+          decoding="async"
+        />
+      </div>
+    )
+  }
+
+  <div class="row__body">
+    <Heading class="txt-h2 row__title">{data.title}</Heading>
+    {showExcerpt && <p class="txt-s txt-dim row__excerpt line-clamp-2">{data.excerpt}</p>}
+    <PostMeta post={post} />
+  </div>
+</a>

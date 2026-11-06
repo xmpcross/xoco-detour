@@ -1,0 +1,41 @@
+---
+/**
+ * The logo, drawn rather than set: the name as artwork, so it does not depend
+ * on a webfont the rest of the site does not use.
+ *
+ * The drawing is `src/assets/logo.svg` — replace that one file and the header,
+ * the drawer and their responsive sizes all follow. It is inlined rather than
+ * loaded as an image so it can take its colour from the type around it, and the
+ * normalising below means a file straight out of Illustrator or Figma works
+ * as-is: the XML prolog, an intrinsic `width`/`height` and a missing `fill` are
+ * all handled here rather than by hand in the asset.
+ */
+import logo from "@/assets/logo.svg?raw";
+
+interface Props {
+  class?: string;
+}
+
+const { class: className = "" } = Astro.props;
+
+const open = logo.match(/<svg\b[^>]*>/i);
+if (!open) throw new Error("src/assets/logo.svg does not contain an <svg> element.");
+
+const attrs = open[0]
+  /* An intrinsic size would beat `--logo-height`; the viewBox carries the shape. */
+  .replace(/\s+(width|height)="[^"]*"/gi, "")
+  .replace(/\s+id="[^"]*"/gi, "")
+  .replace(/\s+(class|aria-hidden|focusable)="[^"]*"/gi, "")
+  .replace(/^<svg/i, "");
+
+/* Only when the file sets no colour of its own — a logo that ships its own
+   palette keeps it. */
+const inherits = /\bfill=/i.test(attrs) ? "" : ' fill="currentColor"';
+const cls = ["logo__mark", className].filter(Boolean).join(" ");
+
+const markup =
+  `<svg class="${cls}" aria-hidden="true" focusable="false"${inherits}${attrs}` +
+  logo.slice((open.index ?? 0) + open[0].length);
+---
+
+<Fragment set:html={markup} />

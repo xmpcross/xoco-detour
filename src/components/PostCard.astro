@@ -1,0 +1,148 @@
+---
+import { Image } from "astro:assets";
+import CategoryTag from "@/components/CategoryTag.astro";
+import { postHref, type Post } from "@/lib/posts";
+
+/**
+ * Every card on the site is a photograph first. The variants differ in crop
+ * and in how much type they carry, never in whether the picture leads — a
+ * travel story sells the place, and a headline over a grey box does not.
+ */
+interface Props {
+  post: Post;
+  /**
+   * `card`    — 3:2 cover, the section, the headline, centred (the default,
+   *             and what every grid on the site carries)
+   * `poster`  — 4:5 cover with the headline set over the foot of it
+   * `compact` — a square thumbnail beside the headline, for lists
+   * `plain`   — no picture at all: the caption strip and the headline
+   */
+  variant?: "card" | "poster" | "compact" | "plain";
+  /** Loads the cover eagerly — set it on cards that render above the fold. */
+  eager?: boolean;
+  showExcerpt?: boolean;
+  showCategory?: boolean;
+  /** `sizes` for the cover. Worth setting wherever a card is not in a grid. */
+  sizes?: string;
+  headingLevel?: "h2" | "h3" | "h4";
+  class?: string;
+}
+
+const {
+  post,
+  variant = "card",
+  eager = false,
+  showExcerpt = false,
+  showCategory = true,
+  sizes,
+  headingLevel = "h3",
+  class: className = "",
+} = Astro.props;
+
+const href = postHref(post);
+const data = post.data;
+const image = data.cover;
+const loading = eager ? "eager" : "lazy";
+const Heading = headingLevel;
+
+/* The grids are three across from 48rem up and two below it, inside a measure
+   that stops at 1500px — so past 96rem the column stops growing and the width
+   is a number, not a fraction of the window. */
+const gridSizes = sizes ?? "(min-width: 96rem) 482px, (min-width: 48rem) 32vw, 47vw";
+
+/*
+ * A crop taller than the photograph is filled to the height of its frame, not
+ * to the width — so a 3:2 picture in a 4:5 box is drawn nearly twice as wide
+ * as the box, and asking for the box width is what makes a poster look soft.
+ */
+const posterSizes = sizes ?? "(min-width: 96rem) 904px, (min-width: 48rem) 60vw, 88vw";
+const squareSizes = sizes ?? "(min-width: 64rem) 9rem, 7.5rem";
+---
+
+{
+  /* A photograph, the section, the headline. Centred, and with nothing else in
+     it: no date, no read time, no rule. A grid of these is the quietest way to
+     put twelve places in front of somebody. */
+  variant === "card" && (
+    <article class:list={["card zoom-host", className]}>
+      <div class="media media--wide">
+        <Image
+          src={image.src}
+          alt={image.alt}
+          widths={[360, 520, 720, 980, 1280]}
+          sizes={gridSizes}
+          loading={loading}
+          decoding="async"
+        />
+      </div>
+      <a class="hit" href={href} aria-label={data.title} />
+      <div class="card__body">
+        {showCategory && <p class="label card__kicker">{data.category}</p>}
+        <Heading class="txt-h3 card__title">{data.title}</Heading>
+        {showExcerpt && <p class="txt-s txt-dim card__excerpt line-clamp-2">{data.excerpt}</p>}
+      </div>
+    </article>
+  )
+}
+
+{
+  /* The headline sits on the picture. Used where a block wants weight without
+     a second column of type — the poster wall, and the section rails. */
+  variant === "poster" && (
+    <article class:list={["card card--poster zoom-host", className]}>
+      <div class="media media--tall">
+        <Image
+          src={image.src}
+          alt={image.alt}
+          widths={[520, 720, 980, 1280, 1800]}
+          sizes={posterSizes}
+          loading={loading}
+          decoding="async"
+        />
+        <span class="card--poster__scrim" aria-hidden="true" />
+        <div class="card--poster__body">
+          {showCategory && <CategoryTag category={data.category} variant="fill" linked={false} />}
+          <Heading class="txt-h3 card--poster__title">{data.title}</Heading>
+        </div>
+      </div>
+      <a class="hit" href={href} aria-label={data.title} />
+    </article>
+  )
+}
+
+{
+  /* A list entry: square thumbnail, caption strip, headline. Reads as a
+     schedule rather than as a grid, which is what the aside columns need. */
+  variant === "compact" && (
+    <article class:list={["card-compact", className]}>
+      <div class="card-compact__media">
+        <Image
+          src={image.src}
+          alt=""
+          widths={[240, 360, 480]}
+          sizes={squareSizes}
+          loading={loading}
+          decoding="async"
+        />
+      </div>
+      <a class="hit" href={href} aria-label={data.title} />
+      <div class="card-compact__body">
+        {showCategory && <p class="label card__kicker">{data.category}</p>}
+        <Heading class="txt-h4 card-compact__title">{data.title}</Heading>
+      </div>
+    </article>
+  )
+}
+
+{
+  /* No picture at all. The block that proves the archive runs deeper than the
+     photographs around it, and the rest the eye needs between two grids. */
+  variant === "plain" && (
+    <article class:list={["card-plain", className]}>
+      {showCategory && <p class="label card__kicker">{data.category}</p>}
+      <a class="hit" href={href} aria-label={data.title} />
+      <Heading class="txt-h3 card-plain__title">{data.title}</Heading>
+      {showExcerpt && <p class="txt-s txt-dim line-clamp-2">{data.excerpt}</p>}
+    </article>
+  )
+}

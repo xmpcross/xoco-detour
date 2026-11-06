@@ -1,0 +1,143 @@
+---
+import type { CategoryTint } from "@/config/categories";
+
+/**
+ * The block that names a page. On a section page it wears that section's tint,
+ * which is the same colour the front page used for it — so arriving from the
+ * category browser feels like following a thread rather than landing somewhere
+ * new.
+ */
+interface Props {
+  title: string;
+  eyebrow?: string;
+  description?: string;
+  meta?: string;
+  /** Set false when the block below opens with its own rule. */
+  divider?: boolean;
+  /** `center` sets the block on the page's axis — the section pages use it. */
+  align?: "start" | "center";
+  /** Paints the header in a section's tint. */
+  tint?: CategoryTint;
+  /** Sets the block in a box, the way a section header is, without a tint. */
+  panel?: boolean;
+  class?: string;
+}
+
+const {
+  title,
+  eyebrow,
+  description,
+  meta,
+  divider = true,
+  align = "start",
+  tint,
+  panel = false,
+  class: className = "",
+} = Astro.props;
+---
+
+<header
+  class:list={[
+    "page-header opener",
+    !divider && "page-header--flush",
+    align === "center" && "page-header--center",
+    tint && "page-header--tinted",
+    panel && !tint && "page-header--panel",
+    className,
+  ]}
+  style={tint ? `--panel-tint: var(--tint-${tint})` : undefined}
+>
+  {eyebrow && <p class="label page-header__eyebrow">{eyebrow}</p>}
+  <h1 class="txt-h1">{title}</h1>
+  {description && <p class="txt-l page-header__description">{description}</p>}
+  {meta && <p class="label page-header__meta">{meta}</p>}
+  <slot />
+</header>
+
+<style>
+  .page-header {
+    display: grid;
+    gap: 0.85rem;
+    justify-items: start;
+    border-bottom: 1px solid var(--border-strong);
+    padding-block: clamp(2rem, 5vw, 3.5rem) 1.75rem;
+  }
+
+  .page-header--flush {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .page-header--center {
+    justify-items: center;
+    text-align: center;
+  }
+
+  /* Both boxed variants are panels rather than ruled blocks: they have a
+     ground of their own, so a rule under one would draw a line inside it. */
+  .page-header--tinted,
+  .page-header--panel {
+    border-bottom: 0;
+    border-radius: var(--r-lg);
+    padding: clamp(1.5rem, 4vw, 3rem) clamp(1.25rem, 4vw, 3rem);
+    margin-top: 1.5rem;
+  }
+
+  .page-header--tinted {
+    background: var(--panel-tint);
+    color: var(--n-900);
+  }
+
+  /* Neutral on purpose: a tint means "this section", and the pages that use
+     this variant are not sections. */
+  .page-header--panel {
+    background: var(--wash);
+  }
+
+  .page-header__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: var(--accent-ink);
+  }
+
+  .page-header--tinted .page-header__eyebrow {
+    color: var(--n-700);
+  }
+
+  .page-header__eyebrow::before {
+    width: 1.5rem;
+    height: 2px;
+    content: "";
+    background: currentColor;
+  }
+
+  /* Centred, the dash sits on both sides of the word. */
+  .page-header--center .page-header__eyebrow::after {
+    width: 1.5rem;
+    height: 2px;
+    content: "";
+    background: currentColor;
+  }
+
+  .page-header .txt-h1 {
+    max-width: 18ch;
+  }
+
+  .page-header__description {
+    max-width: 54ch;
+    color: var(--muted-foreground);
+  }
+
+  .page-header--tinted .page-header__description {
+    color: var(--n-700);
+  }
+
+  .page-header__meta {
+    color: var(--muted-foreground);
+  }
+
+  .page-header--tinted .page-header__meta {
+    color: var(--n-600);
+  }
+</style>

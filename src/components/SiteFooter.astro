@@ -1,0 +1,214 @@
+---
+import LocalIcon from "@/components/LocalIcon.astro";
+import SubscribeForm from "@/components/SubscribeForm.astro";
+import Logo from "@/components/ui/Logo.astro";
+import SwapText from "@/components/ui/SwapText.astro";
+import { footerNavigation, siteConfig } from "@/config/site";
+import { socialIconFor } from "@/lib/socials";
+
+/**
+ * The colophon: the signup centred across the top, the link columns under it,
+ * and the legal line at the foot. The signup lives here rather than as a panel
+ * above the footer, so a page ends once rather than twice.
+ */
+const currentYear = new Date().getFullYear();
+---
+
+<footer class="site-footer" data-site-footer>
+  <div class="container site-footer__inner">
+    <div class="site-footer__signup reveal" id="newsletter" aria-labelledby="footer-newsletter-title">
+      <p class="txt-h2 site-footer__signupTitle" id="footer-newsletter-title">
+        {siteConfig.newsletter.title}
+      </p>
+      <p class="txt-s site-footer__signupNote">{siteConfig.newsletter.description}</p>
+      <SubscribeForm id="footer-newsletter-email" showTerms={false} />
+    </div>
+
+    <div class="site-footer__columns reveal">
+      <div class="site-footer__about">
+        <a href="/" class="logo site-footer__logo" aria-label={`${siteConfig.name} home`}>
+          <Logo />
+        </a>
+        <p class="txt-s site-footer__bio">{siteConfig.bio}</p>
+        <ul class="site-footer__socials hover-fade-group">
+          {
+            siteConfig.socials.map((item) => (
+              <li>
+                <a
+                  href={item.href}
+                  class="icon-btn icon-btn--line"
+                  aria-label={item.label}
+                  rel={item.href.startsWith("http") ? "noreferrer" : undefined}
+                >
+                  <LocalIcon name={socialIconFor(item.label)} className="h-4 w-4" />
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+
+      <nav class="site-footer__nav" aria-label="Footer">
+        {
+          footerNavigation.map((group) => (
+            <div class="site-footer__group">
+              <p class="label site-footer__kicker">{group.title}</p>
+              <ul class="hover-fade-group">
+                {group.links.map((link) => (
+                  <li>
+                    <a class="txt-s site-footer__link" href={link.href}>
+                      <SwapText text={link.label} />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        }
+      </nav>
+    </div>
+
+    <div class="site-footer__bottom">
+      <p class="txt-xs">&copy; {currentYear} {siteConfig.name}. All rights reserved.</p>
+      <p class="txt-xs">
+        Built with{" "}
+        <a class="underline-hover" href="https://astro.build" rel="noreferrer">Astro</a>
+      </p>
+    </div>
+  </div>
+</footer>
+
+<style>
+  /* Pale rather than dark: the page is white, and a black slab at the foot of
+     it is a different website stapled to the bottom. */
+  .site-footer {
+    margin-top: var(--section-gap);
+    border-top: 1px solid var(--border);
+    background: var(--wash);
+  }
+
+  .site-footer__inner {
+    display: grid;
+    gap: 2.5rem;
+    padding-block: clamp(2.25rem, 5vw, 3.5rem) 1.25rem;
+  }
+
+  .site-footer__kicker {
+    color: var(--muted-foreground);
+  }
+
+  /* Centred, with the field under the copy rather than beside it: the page
+     ends on the one thing it is asking for, set on the page's own axis. */
+  .site-footer__signup {
+    display: grid;
+    justify-items: center;
+    gap: 0.6rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 2.5rem;
+    text-align: center;
+  }
+
+  .site-footer__signupTitle {
+    max-width: 22ch;
+  }
+
+  .site-footer__signupNote {
+    max-width: 48ch;
+    color: var(--muted-foreground);
+  }
+
+  .site-footer__signup :global(form) {
+    margin-top: 0.9rem;
+    width: min(28rem, 100%);
+  }
+
+  .site-footer__columns {
+    display: grid;
+    gap: 2.5rem;
+  }
+
+  .site-footer__about {
+    display: grid;
+    align-content: start;
+    gap: 0.75rem;
+    max-width: 34ch;
+  }
+
+  /* The masthead's drawing at a smaller size. `.logo` is a global rule built
+     for the header's flex row, so the two of its declarations that only make
+     sense there are taken back. */
+  .site-footer__logo {
+    order: 0;
+    justify-self: start;
+    margin-right: 0;
+    --logo-height: 1.6rem;
+  }
+
+  .site-footer__bio {
+    color: var(--muted-foreground);
+  }
+
+  .site-footer__socials,
+  .site-footer__nav ul {
+    display: flex;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .site-footer__socials {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.25rem;
+  }
+
+  .site-footer__nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2rem 1.5rem;
+  }
+
+  .site-footer__group {
+    display: grid;
+    align-content: start;
+    gap: 0.85rem;
+  }
+
+  .site-footer__nav ul {
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .site-footer__link {
+    color: var(--foreground);
+    transition: color 0.25s ease;
+  }
+
+  .site-footer__link:hover {
+    color: var(--accent-ink);
+  }
+
+  .site-footer__bottom {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem 1.75rem;
+    border-top: 1px solid var(--border);
+    padding-top: 1.25rem;
+    color: var(--muted-foreground);
+  }
+
+  @media (min-width: 48rem) {
+    .site-footer__nav {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .site-footer__columns {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+      gap: 4rem;
+    }
+  }
+</style>

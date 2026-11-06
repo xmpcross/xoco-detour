@@ -1,0 +1,57 @@
+{
+  "name": "detour-astro-theme",
+  "description": "An Astro travel magazine theme: image-led stories, a dense magazine front page, and a 1500px sheet.",
+  "type": "module",
+  "version": "1.0.2",
+  "author": "Andrei Alba",
+  "license": "SEE LICENSE IN LICENSE",
+  "private": true,
+  "keywords": [
+    "astro-theme",
+    "astro",
+    "travel-blog",
+    "travel",
+    "magazine",
+    "guides",
+    "blog",
+    "editorial",
+    "tailwindcss"
+  ],
+  "homepage": "https://detour.xocoweb.workers.dev/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xocothemes/detour.git"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "check": "astro check",
+    "release:check": "npm run check && npm run build && npm run format:check",
+    "preview": "astro preview",
+    "astro": "astro",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "overrides": {
+    "yaml": "^2.8.3"
+  },
+  "dependencies": {
+    "@astrojs/mdx": "^7.0.8",
+    "@astrojs/rss": "^4.0.19",
+    "@astrojs/sitemap": "^3.7.4",
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.4.1",
+    "sharp": "^0.35.5",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.11",
+    "@types/node": "^22.20.5",
+    "prettier": "^3.9.10",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5"
+  }
+}

@@ -1,0 +1,176 @@
+---
+import { getCollection } from "astro:content";
+import SavedRuntime from "@/components/SavedRuntime.astro";
+import SiteFooter from "@/components/SiteFooter.astro";
+import SiteHeader from "@/components/SiteHeader.astro";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { siteConfig } from "@/config/site";
+import { visiblePosts } from "@/lib/posts";
+
+/**
+ * The reader's reading list. Everything here is per-browser: the page reads
+ * the slugs the save buttons wrote to `localStorage`, looks them up in the
+ * same `/search-index.json` the search surfaces use, and paints a grid of the
+ * site's standard cards. Nothing leaves the browser and there is nothing to
+ * sign in to.
+ */
+const allPosts = visiblePosts(await getCollection("posts"));
+---
+
+<BaseLayout
+  title="Saved stories"
+  description={`Stories you saved on ${siteConfig.name}, kept in this browser.`}
+  noindex
+>
+  <SiteHeader posts={allPosts} />
+  <SavedRuntime />
+  <main id="content">
+    <div class="container saved-page">
+      <header class="saved-page-head opener">
+        <h1 class="txt-h2">Saved stories</h1>
+        <p class="txt-s txt-dim" data-saved-summary aria-live="polite">
+          Stories you save are kept in this browser.
+        </p>
+      </header>
+
+      <div class="saved-grid" data-saved-results hidden></div>
+
+      <p class="txt-m txt-dim saved-page-empty" data-saved-empty>
+        Nothing saved yet. Open any article and tap Save to keep it here.
+      </p>
+    </div>
+  </main>
+  <SiteFooter />
+
+  <script is:inline>
+    (() => {
+      const results = document.querySelector("[data-saved-results]");
+      const empty = document.querySelector("[data-saved-empty]");
+      const summary = document.querySelector("[data-saved-summary]");
+      if (!results || !empty || !summary) return;
+
+      const { escapeHtml, cardMarkup, load } = window.detourSearch;
+
+      /* The shared card, with the control that takes it off the list pinned to
+         the corner of its cover. */
+      const tileMarkup = (item, slug) => `
+        <div class="saved-tile">
+          ${cardMarkup(item)}
+          <button type="button" class="saved-tile__remove" data-saved-remove="${escapeHtml(slug)}" aria-label="Remove ${escapeHtml(item.title)} from your saved stories">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 6 12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+      `;
+
+      const render = async () => {
+        const slugs = window.detourSaved.list();
+
+        if (slugs.length === 0) {
+          summary.textContent = "Stories you save are kept in this browser.";
+          results.innerHTML = "";
+          results.hidden = true;
+          empty.hidden = false;
+          return;
+        }
+
+        const items = await load();
+        const byHref = new Map(items.map((item) => [item.href, item]));
+        /* A saved slug with no index entry is a post since unpublished —
+           dropped rather than rendered as a dead link. */
+        const saved = slugs
+          .map((slug) => ({ slug, item: byHref.get(`/post/${slug}/`) }))
+          .filter((entry) => entry.item);
+
+        summary.textContent = `${saved.length} ${saved.length === 1 ? "story" : "stories"}, newest saved first`;
+        results.innerHTML = saved.map((entry) => tileMarkup(entry.item, entry.slug)).join("");
+        results.hidden = saved.length === 0;
+        empty.hidden = saved.length > 0;
+      };
+
+      results.addEventListener("click", (event) => {
+        const button =
+          event.target instanceof Element && event.target.closest("[data-saved-remove]");
+        if (!button) return;
+        window.detourSaved.remove(button.dataset.savedRemove);
+        void render();
+      });
+
+      void render();
+    })();
+  </script>
+
+  <style>
+    .saved-page {
+      padding-top: clamp(2rem, 6vw, 4rem);
+      padding-bottom: var(--section-gap);
+    }
+
+    .saved-page-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.5rem 1.5rem;
+      margin-bottom: 1.75rem;
+    }
+
+    .saved-page-empty {
+      padding-block: 2.5rem;
+    }
+
+    /*
+     * The same columns as `.grid-posts`, under a name of its own: the reveal
+     * observer in the layout runs once at DOMContentLoaded over
+     * `.grid-posts > *`, so cards painted later would be left at opacity 0.
+     */
+    .saved-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 2rem 1.25rem;
+    }
+
+    @media (min-width: 48rem) {
+      .saved-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 2.75rem 1.75rem;
+      }
+    }
+
+    /* The cards are script-built, so nothing below carries this page's scoping
+       attribute — everything is addressed through :global. */
+    .saved-grid :global(.saved-tile) {
+      position: relative;
+      min-width: 0;
+    }
+
+    /* Above the card's own overlay link, or the control would not be
+       clickable. */
+    .saved-grid :global(.saved-tile__remove) {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      z-index: 3;
+      display: inline-grid;
+      width: 2rem;
+      height: 2rem;
+      place-items: center;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--r-full);
+      background: var(--surface);
+      color: var(--foreground);
+      cursor: pointer;
+      padding: 0;
+      box-shadow: var(--shadow-md);
+      transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        color 0.2s ease;
+    }
+
+    .saved-grid :global(.saved-tile__remove:hover) {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: var(--accent-foreground);
+    }
+  </style>
+</BaseLayout>

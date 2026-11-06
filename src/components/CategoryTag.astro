@@ -1,0 +1,35 @@
+---
+import { categorySlug, type Category } from "@/lib/posts";
+
+/**
+ * The section tag. Set in mono capitals rather than as a pill, because it
+ * appears on every card of a dense page and forty pills is a bag of sweets.
+ * `fill` is the one variant that takes a shape — it is for covers, where type
+ * alone cannot survive the photograph under it.
+ */
+interface Props {
+  category: Category;
+  /**
+   * `plain` — mono capitals, the default and what the grids use
+   * `fill`  — a near-black chip, for type sitting on a cover
+   * `mark`  — the accent chip, for the one card a block is about
+   */
+  variant?: "plain" | "fill" | "mark";
+  linked?: boolean;
+  class?: string;
+}
+
+const { category, variant = "plain", linked = true, class: className = "" } = Astro.props;
+const classes = ["tag", `tag--${variant}`, className];
+const href = `/category/${categorySlug(category)}/`;
+---
+
+{
+  linked ? (
+    <a class:list={classes} href={href}>
+      {category}
+    </a>
+  ) : (
+    <span class:list={classes}>{category}</span>
+  )
+}

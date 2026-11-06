@@ -1,0 +1,46 @@
+---
+import { categoryTints } from "@/config/categories";
+import { categorySlug, type Category } from "@/lib/posts";
+
+/**
+ * One sentence, set as large as the page allows, with every section name in it
+ * a link highlighted in that section's own tint.
+ *
+ * It is the site's table of contents written as prose rather than as a menu,
+ * and it is the only place the tints appear all at once — which is what makes
+ * the colour code legible before a reader has met any of the panels that use
+ * it. The sentence is built from `categories`, so adding a section rewrites it.
+ */
+interface Props {
+  categories: readonly Category[];
+  id?: string;
+}
+
+const { categories, id } = Astro.props;
+
+/** Oxford-less: the last two join with "and", the rest with commas. */
+const joiner = (index: number) => {
+  if (index === 0) return "";
+  return index === categories.length - 1 ? " and " : ", ";
+};
+---
+
+<p class="topics reveal" id={id}>
+  <span class="topics__lead">Detour files from</span>{" "}
+  {
+    categories.map((category, index) => (
+      <>
+        {joiner(index)}
+        <a
+          class="topics__link"
+          href={`/category/${categorySlug(category)}/`}
+          style={`--panel-tint: var(--tint-${categoryTints[category]})`}
+        >
+          {category}
+        </a>
+      </>
+    ))
+  }
+  <span class="topics__lead">— and from the roads between them.</span>{" "}
+  <a class="topics__all" href="/posts/">The whole archive.</a>
+</p>

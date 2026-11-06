@@ -1,0 +1,251 @@
+---
+import LocalIcon from "@/components/LocalIcon.astro";
+import Icon from "@/components/ui/Icon.astro";
+import Logo from "@/components/ui/Logo.astro";
+import { secondaryNavigation, siteConfig } from "@/config/site";
+import {
+  categories,
+  categorySlug,
+  getByCategory,
+  storyLayoutExamples,
+  visiblePosts,
+  type Post,
+} from "@/lib/posts";
+import { socialIconFor } from "@/lib/socials";
+
+/**
+ * The site menu: the sections as a compact contents list, then the opening
+ * layouts and the site pages side by side, then the signup.
+ *
+ * It opens on the side the Menu control is on — from the left from tablet up,
+ * from the right on a phone, where the control sits at the other end of the
+ * masthead.
+ */
+interface Props {
+  posts: Post[];
+}
+
+const posts = visiblePosts(Astro.props.posts);
+const currentPath = Astro.url.pathname;
+
+/** The `↗` is drawn on a link that leaves the site, and on nothing else. */
+const isExternal = (href: string) => /^[a-z][a-z0-9+.-]*:/i.test(href);
+
+/* One row per section, skipping any with nothing published yet. */
+const sections = categories
+  .filter((category) => getByCategory(posts, category).length > 0)
+  .map((category) => ({
+    label: category,
+    href: `/category/${categorySlug(category)}/`,
+  }));
+
+/* One live example per opening treatment. */
+const layouts = storyLayoutExamples(posts);
+---
+
+<div class="drawer-scrim" data-drawer-scrim data-drawer-close aria-hidden="true"></div>
+
+<aside id="site-drawer" class="drawer" aria-label="Site menu" hidden data-drawer-panel>
+  <div class="drawer__bar">
+    <a href="/" class="logo" aria-label={`${siteConfig.name} home`}>
+      <Logo />
+    </a>
+    <button type="button" class="icon-btn icon-btn--quiet" data-drawer-close aria-label="Close menu">
+      <Icon name="close" size={18} />
+    </button>
+  </div>
+
+  <div class="drawer__body">
+    <button type="button" class="drawer__search" data-search-toggle>
+      <Icon name="search" size={16} />
+      <span>Search stories</span>
+      <kbd aria-hidden="true">/</kbd>
+    </button>
+
+    <nav class="drawer__group" aria-label="Sections">
+      <p class="label txt-dim">Contents</p>
+      <ol class="drawer__toc">
+        {
+          sections.map((item, index) => (
+            <li style={`--row:${index}`}>
+              <a
+                class="drawer__row"
+                href={item.href}
+                aria-current={currentPath === item.href ? "page" : undefined}
+                rel={isExternal(item.href) ? "noreferrer" : undefined}
+              >
+                <span class="drawer__row-name">{item.label}</span>
+                {isExternal(item.href) && <Icon name="arrow-up-right" size={13} class="drawer__ext" />}
+              </a>
+            </li>
+          ))
+        }
+      </ol>
+    </nav>
+
+    <div class="drawer__grid">
+      {
+        layouts.length > 0 && (
+          <nav class="drawer__group" aria-label="Post layouts">
+            <p class="label txt-dim">Post layouts</p>
+            <ul class="drawer__list">
+              {layouts.map((item) => (
+                <li>
+                  <a class="drawer__small" href={item.href}>
+                    {item.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )
+      }
+
+      <nav class="drawer__group" aria-label="The site">
+        <p class="label txt-dim">The site</p>
+        <ul class="drawer__list">
+          {
+            secondaryNavigation.map((item) => (
+              <li>
+                <a
+                  class="drawer__small"
+                  href={item.href}
+                  aria-current={currentPath === item.href ? "page" : undefined}
+                  rel={isExternal(item.href) ? "noreferrer" : undefined}
+                >
+                  {item.label}
+                  {isExternal(item.href) && (
+                    <Icon name="arrow-up-right" size={12} class="drawer__ext" />
+                  )}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
+    </div>
+  </div>
+
+  <div class="drawer__foot">
+    <p class="drawer__foot-copy">{siteConfig.newsletter.title}</p>
+    <div class="drawer__foot-row">
+      <a class="btn" href="/#newsletter">Subscribe</a>
+      <ul class="drawer__socials">
+        {
+          siteConfig.socials.map((item) => (
+            <li>
+              <a
+                href={item.href}
+                class="icon-btn"
+                aria-label={item.label}
+                rel={isExternal(item.href) ? "noreferrer" : undefined}
+              >
+                <LocalIcon name={socialIconFor(item.label)} className="h-4 w-4" />
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </div>
+</aside>
+
+<script is:inline>
+  (() => {
+    const drawer = document.querySelector("[data-drawer-panel]");
+    const scrim = document.querySelector("[data-drawer-scrim]");
+    const openers = document.querySelectorAll("[data-drawer-open]");
+    const closers = document.querySelectorAll("[data-drawer-close]");
+    if (!drawer || openers.length === 0) return;
+
+    const focusableSelector =
+      'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    let inertedElements = [];
+    let lastOpener;
+
+    const setOpen = (open) => {
+      drawer.hidden = !open;
+      document.documentElement.classList.toggle("has-open-drawer", open);
+      openers.forEach((button) => button.setAttribute("aria-expanded", String(open)));
+
+      if (open) {
+        /*
+         * Everything behind the drawer goes inert, so a screen reader and the
+         * tab key both stay inside it while it is up.
+         *
+         * Walk up from the drawer rather than reaching for `document.body`
+         * directly: at every level it inerts the siblings and leaves the
+         * ancestor it came through alone. Marking the body's children would
+         * work only while the drawer is a child of the body — wrap the site in
+         * one element and the same line inerts the drawer's own container,
+         * which takes the drawer down with it.
+         *
+         * The scrim is exempt. It carries nothing focusable and is already
+         * aria-hidden, so the trap still holds, and an inert scrim would
+         * swallow the click that is supposed to close the drawer.
+         */
+        for (let node = drawer; node && node !== document.body; node = node.parentElement) {
+          const parent = node.parentElement;
+          if (!parent) break;
+
+          Array.from(parent.children).forEach((element) => {
+            if (element === node || element === scrim || element.inert) return;
+            element.inert = true;
+            inertedElements.push(element);
+          });
+        }
+
+        window.requestAnimationFrame(() => drawer.querySelector(focusableSelector)?.focus());
+      } else {
+        inertedElements.forEach((element) => {
+          element.inert = false;
+        });
+        inertedElements = [];
+        lastOpener?.focus();
+      }
+    };
+
+    openers.forEach((button) => {
+      button.addEventListener("click", () => {
+        lastOpener = button;
+        setOpen(drawer.hidden);
+      });
+    });
+
+    closers.forEach((button) => button.addEventListener("click", () => setOpen(false)));
+
+    // The drawer marks its siblings inert, and the search dialog is one of
+    // them — opening search from in here without closing first would put up a
+    // modal that cannot take focus. The header asks us to stand down first.
+    document.addEventListener("detour:drawer-close", () => setOpen(false));
+    drawer.querySelectorAll("a").forEach((link) => {
+      link.addEventListener("click", () => setOpen(false));
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (drawer.hidden) return;
+
+      if (event.key === "Escape") {
+        setOpen(false);
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const focusable = Array.from(drawer.querySelectorAll(focusableSelector)).filter(
+        (element) => element.offsetParent !== null,
+      );
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
+  })();
+</script>

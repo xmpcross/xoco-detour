@@ -1,0 +1,333 @@
+---
+import { getCollection } from "astro:content";
+import { Image } from "astro:assets";
+import PostCard from "@/components/PostCard.astro";
+import PageHeader from "@/components/PageHeader.astro";
+import SectionHeader from "@/components/SectionHeader.astro";
+import SiteFooter from "@/components/SiteFooter.astro";
+import SiteHeader from "@/components/SiteHeader.astro";
+import Icon from "@/components/ui/Icon.astro";
+import SwapText from "@/components/ui/SwapText.astro";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import onTheRoad from "@/assets/images/about/on-the-road.jpg";
+import { siteConfig } from "@/config/site";
+import { authorBio } from "@/config/authors";
+import {
+  categories,
+  formatDate,
+  getAllAuthors,
+  visiblePosts,
+  type Category,
+} from "@/lib/posts";
+
+const allPosts = visiblePosts(await getCollection("posts"));
+const authors = getAllAuthors(allPosts);
+/** Undefined when the configured byline has no published posts. */
+const writer = authors.find((author) => author.name === siteConfig.editor.name);
+/** The way in for somebody new: the newest five, whatever they are. */
+const startHere = allPosts.slice(0, 5);
+
+/*
+ * The writer's record, counted from the archive rather than typed: how many
+ * stories, since when, and the section most of them fall in.
+ * It stays true as the site grows.
+ */
+const writerPosts = writer?.posts ?? [];
+const firstPost = writerPosts.at(-1);
+const favouriteSection = writerPosts.reduce((tally, post) => {
+    tally.set(post.data.category, (tally.get(post.data.category) ?? 0) + 1);
+    return tally;
+  }, new Map<Category, number>())
+  .entries()
+  .reduce<[Category, number] | undefined>(
+    (best, entry) => (best && best[1] >= entry[1] ? best : entry),
+    undefined,
+  )?.[0];
+
+const principles = [
+  {
+    title: "Go once, in the season",
+    body: `Nothing is published here off the back of a press trip or a weekend in the wrong month. Every route on ${siteConfig.name} was taken in the season it is written about, which is the only way to know what the weather actually does to it.`,
+  },
+  {
+    title: "Name the cost",
+    body: "A recommendation with no number attached is a recommendation somebody else is paying for. If a stay, a ticket, or a meal is worth the detour, the page says what it came to and when the price was checked.",
+  },
+  {
+    title: "Say what did not work",
+    body: "Most travel writing stops at the good afternoon. Every story here says which part of the trip was a mistake, what it would take to avoid it, and when the honest answer is to skip the place entirely.",
+  },
+];
+---
+
+<BaseLayout
+  title="About"
+  description={`About ${siteConfig.name}: where the stories come from, how they are reported, and who writes them.`}
+  image={onTheRoad}
+  imageAlt="A traveller in a wide-brimmed hat and backpack looking out over a desert valley"
+>
+  <SiteHeader posts={allPosts} />
+  <main id="content">
+    <div class="container">
+      <PageHeader
+        title="Every route here was taken the long way round."
+        description={siteConfig.bio}
+        meta={`${allPosts.length} stories across ${categories.length} sections`}
+        align="center"
+        panel
+      />
+    </div>
+
+    <div class="container section section-top">
+      <figure class="about-figure opener">
+        <div class="media media--photo">
+          <Image
+            src={onTheRoad}
+            alt="A traveller in a wide-brimmed hat and backpack looking out over a desert valley"
+            widths={[640, 960, 1280, 1600, 2000]}
+            sizes="100vw"
+            loading="eager"
+            fetchpriority="high"
+            decoding="async"
+          />
+        </div>
+        <figcaption class="txt-xs txt-dim about-figure__credit">
+          Photo credit:{" "}
+          <a
+            class="underline-hover"
+            href="https://www.pexels.com/photo/a-woman-with-a-backpack-18275080/"
+            rel="noreferrer">Miriam Espacio</a
+          >
+        </figcaption>
+      </figure>
+    </div>
+
+    {
+      writer && (
+        <section class="container section" aria-labelledby="about-byline">
+          <div class="about-byline">
+            <div class="about-byline__intro reveal">
+              <p class="label about-byline__eyebrow">{siteConfig.editor.title}</p>
+              <h2 class="txt-h1" id="about-byline">
+                {writer.name}
+              </h2>
+              <p class="label txt-dim">{writer.role}</p>
+            </div>
+
+            <div class="about-byline__body reveal">
+              <p class="txt-l txt-dim about-byline__bio">
+                {siteConfig.editor.bio || authorBio(writer.name)}
+              </p>
+
+              <a class="section-link about-byline__link" href={`/author/${writer.slug}/`}>
+                <SwapText text={`Everything ${writer.name.split(" ")[0]} has filed`} />
+                <Icon name="arrow-up-right" size={12} />
+              </a>
+            </div>
+
+            <div class="about-byline__record reveal">
+              <dl class="about-byline__facts">
+                <div class="about-byline__fact">
+                  <dt class="label">Stories</dt>
+                  <dd class="nums">{writerPosts.length}</dd>
+                </div>
+                {firstPost && (
+                  <div class="about-byline__fact">
+                    <dt class="label">Filing since</dt>
+                    <dd>
+                      <time datetime={firstPost.data.date.toISOString()}>
+                        {formatDate(firstPost.data.date, "long")}
+                      </time>
+                    </dd>
+                  </div>
+                )}
+                {favouriteSection && (
+                  <div class="about-byline__fact">
+                    <dt class="label">Mostly</dt>
+                    <dd>{favouriteSection}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          </div>
+        </section>
+      )
+    }
+
+    <div class="about-rules">
+      <section class="container" aria-labelledby="about-principles">
+        <SectionHeader title="The house rules" id="about-principles" />
+        <div class="grid-columns" style="--cols:3">
+          {
+            principles.map((principle, index) => (
+              <div class="about-principle reveal">
+                <p class="label about-principle__index">{String(index + 1).padStart(2, "0")}</p>
+                <h3 class="txt-h3">{principle.title}</h3>
+                <p class="txt-s txt-dim">{principle.body}</p>
+              </div>
+            ))
+          }
+        </div>
+      </section>
+    </div>
+
+    {
+      startHere.length > 0 && (
+        <section class="container section" aria-labelledby="about-start">
+          <SectionHeader
+            title="Start here"
+            href="/posts/"
+            linkLabel="The whole archive"
+            id="about-start"
+          />
+          <div class="grid-posts grid-posts--flush">
+            {startHere.map((post) => (
+              <PostCard post={post} variant="poster" headingLevel="h3" />
+            ))}
+          </div>
+        </section>
+      )
+    }
+  </main>
+  <SiteFooter />
+</BaseLayout>
+
+<style>
+  .about-figure {
+    margin: 0;
+  }
+
+  /* Full-bleed, so the rules read as their own chapter between the byline
+     above and the archive below. */
+  .about-rules {
+    border-block: 1px solid var(--border);
+    background: var(--wash);
+    padding-block: var(--section-gap);
+    margin-bottom: var(--section-gap);
+  }
+
+  .about-figure__credit {
+    margin-top: 0.75rem;
+  }
+
+  .about-principle {
+    display: grid;
+    align-content: start;
+    gap: 0.75rem;
+  }
+
+  .about-principle__index {
+    color: var(--accent);
+  }
+
+  /* Three parts across the track: who, in their own words, and the record.
+     One column on a phone, and the full width earns its keep on a desktop —
+     a bio capped at its measure with the rest of the page empty beside it is
+     the thing this block used to be. */
+  .about-byline {
+    display: grid;
+    gap: 1.75rem;
+    align-items: start;
+  }
+
+  .about-byline__intro {
+    display: grid;
+    align-content: start;
+    justify-items: start;
+    gap: 0.4rem;
+  }
+
+  .about-byline__body {
+    display: grid;
+    justify-items: start;
+    gap: 1rem;
+  }
+
+  .about-byline__eyebrow {
+    color: var(--accent);
+  }
+
+  .about-byline__bio {
+    max-width: 58ch;
+  }
+
+  /* The writer's record, ruled above and below. */
+  .about-byline__facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 2.25rem;
+    width: 100%;
+    margin: 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding-block: 0.9rem;
+  }
+
+  .about-byline__fact {
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .about-byline__fact dt {
+    color: var(--muted-foreground);
+  }
+
+  .about-byline__fact dd {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--fs-h4);
+    font-weight: var(--weight-title);
+    letter-spacing: var(--ls-title);
+  }
+
+  /* Text and arrow on one line: the link is a grid item, so without this the
+     block-level icon would drop under the words. */
+  .about-byline__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  @media (min-width: 64rem) {
+    .about-byline {
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 0.7fr);
+      gap: 3.5rem;
+    }
+
+    /* The record reads as a column rather than a strip once it has one of its
+       own: a rule down its left edge, and the facts stacked and ruled between,
+       the same way the front page's aside is divided from the list beside it. */
+    .about-byline__record {
+      border-left: 1px solid var(--border-strong);
+      padding-left: 3.5rem;
+    }
+
+    .about-byline__facts {
+      display: grid;
+      gap: 0;
+      border-top: 0;
+      border-bottom: 0;
+      padding-block: 0;
+    }
+
+    .about-byline__fact {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 1rem;
+      align-items: baseline;
+      border-bottom: 1px solid var(--border);
+      padding-block: 0.7rem;
+    }
+
+    .about-byline__fact:first-child {
+      padding-top: 0;
+    }
+
+    .about-byline__fact:last-child {
+      border-bottom: 0;
+    }
+
+    .about-byline__fact dd {
+      text-align: right;
+    }
+  }
+</style>

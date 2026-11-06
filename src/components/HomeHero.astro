@@ -1,0 +1,244 @@
+---
+import { Image } from "astro:assets";
+import { postHref, type Post } from "@/lib/posts";
+
+/**
+ * The opening: three stories on a slider, each a photograph with its section,
+ * headline and standfirst centred underneath, and a column of the most-read
+ * beside it.
+ *
+ * The slider is three slides and no more. It is a scroll container with snap
+ * points, so it works with a swipe, a trackpad, the arrow keys and the dots
+ * before any script runs — the dots are anchors into the track, which is why
+ * they are painted with the page rather than waiting for JavaScript.
+ *
+ * Each dot fills across while its slide is up, and the slide changes the
+ * moment the fill lands — the mark is the clock rather than a readout of one.
+ *
+ * The photograph is deliberately narrower than its column: the headline and
+ * standfirst under it have to land inside the first screen, and a full-width
+ * cover pushes them past the fold on every laptop.
+ */
+interface Props {
+  slides?: Post[];
+  top?: Post[];
+  /** Heading for the column beside the slider. */
+  topLabel?: string;
+  /** How long a slide holds, in ms. The dot's fill is timed to match. */
+  duration?: number;
+}
+
+const { slides = [], top = [], topLabel = "Top stories", duration = 7000 } = Astro.props;
+---
+
+{
+  slides.length > 0 && (
+    <div class="opening">
+      <div class="opening__slider" data-slider style={`--opening-duration:${duration}ms`}>
+        <div
+          class="opening__track"
+          data-slider-track
+          role="group"
+          aria-label="Featured stories"
+          tabindex="0"
+        >
+          {slides.map((post, index) => (
+            <article class="slide" id={`opening-slide-${index + 1}`} data-slider-slide>
+              <a
+                class="slide__media zoom-host"
+                href={postHref(post)}
+                tabindex="-1"
+                aria-label={post.data.title}
+              >
+                <Image
+                  src={post.data.cover.src}
+                  alt=""
+                  widths={[640, 960, 1280, 1600]}
+                  sizes="(min-width: 64rem) 42rem, 100vw"
+                  loading={index === 0 ? "eager" : "lazy"}
+                  fetchpriority={index === 0 ? "high" : undefined}
+                  decoding="async"
+                />
+              </a>
+
+              <div class="slide__body opener">
+                <p class="label slide__kicker">{post.data.category}</p>
+                <a class="slide__link" href={postHref(post)}>
+                  <h2 class="txt-h1 slide__title">{post.data.title}</h2>
+                </a>
+                <p class="txt-l slide__standfirst">{post.data.excerpt}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+
+        {slides.length > 1 && (
+          <div class="opening__dots" data-slider-dots>
+            {slides.map((post, index) => (
+              <a
+                class="opening__dot"
+                href={`#opening-slide-${index + 1}`}
+                data-slider-dot={index}
+                aria-label={`Show story ${index + 1}: ${post.data.title}`}
+                aria-current={index === 0 ? "true" : undefined}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {top.length > 0 && (
+        <section class="opening__aside opener" aria-labelledby="opening-top">
+          <h2 class="txt-h2 opening__asideHead" id="opening-top">
+            {topLabel}
+          </h2>
+
+          <ol class="opening__list">
+            {top.map((post) => (
+              <li class="opening__item">
+                <a class="opening__itemLink zoom-host" href={postHref(post)}>
+                  <span class="opening__thumb">
+                    <Image
+                      src={post.data.cover.src}
+                      alt=""
+                      widths={[240, 360, 480]}
+                      sizes="9rem"
+                      loading="eager"
+                      decoding="async"
+                    />
+                  </span>
+                  <span class="opening__itemBody">
+                    <span class="label opening__itemKicker">{post.data.category}</span>
+                    <span class="txt-h3 opening__itemTitle">{post.data.title}</span>
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+    </div>
+  )
+}
+
+<script>
+  document.querySelectorAll<HTMLElement>("[data-slider]").forEach((slider) => {
+    const track = slider.querySelector<HTMLElement>("[data-slider-track]");
+    const dots = Array.from(slider.querySelectorAll<HTMLAnchorElement>("[data-slider-dot]"));
+    if (!track || dots.length < 2) return;
+
+    const slides = Array.from(track.children) as HTMLElement[];
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    const goTo = (index: number, smooth = true) => {
+      track.scrollTo({
+        left: slides[index].offsetLeft - track.offsetLeft,
+        behavior: smooth && !reduced.matches ? "smooth" : "auto",
+      });
+    };
+
+    /* Which slide is under the middle of the track decides the current mark,
+       so a half-swipe that settles back does not leave the wrong one lit. */
+    const currentIndex = () => {
+      const middle = track.scrollLeft + track.clientWidth / 2;
+      let current = 0;
+      slides.forEach((slide, index) => {
+        const left = slide.offsetLeft - track.offsetLeft;
+        if (left <= middle && left + slide.offsetWidth > middle) current = index;
+      });
+      return current;
+    };
+
+    let current = -1;
+
+    const paint = () => {
+      const next = currentIndex();
+      if (next === current) return;
+      current = next;
+
+      dots.forEach((dot, index) => {
+        /* Off, reflow, on: re-adding the class has to count as a new
+           animation rather than as a continuation of the old one. */
+        dot.classList.remove("is-active", "is-done");
+        void dot.offsetWidth;
+
+        if (index < current) dot.classList.add("is-done");
+
+        if (index === current) {
+          dot.classList.add("is-active");
+          dot.setAttribute("aria-current", "true");
+        } else {
+          dot.removeAttribute("aria-current");
+        }
+      });
+    };
+
+    /*
+     * The filling mark is the clock. Advancing on its `animationend` rather
+     * than on a timer running alongside it means the mark and the slide can
+     * never disagree, holding is one class — a paused animation stops both at
+     * once — and `prefers-reduced-motion`, which turns the fill off in the
+     * stylesheet, turns the rotation off with it.
+     *
+     * The animation runs on the mark's `::after`; the event is dispatched to
+     * the element the pseudo-element belongs to, which is the anchor here.
+     */
+    dots.forEach((dot, index) => {
+      /* The dots are anchors, so they already work; taking the click back
+         gives the smooth scroll and keeps the page from jumping. */
+      dot.addEventListener("click", (event) => {
+        event.preventDefault();
+        goTo(index);
+      });
+
+      dot.addEventListener("animationend", () => {
+        if (index === current) goTo((current + 1) % slides.length);
+      });
+    });
+
+    /* It holds the moment a reader is anywhere near the block — pointer over
+       it, focus inside it, tab in the background, block off screen — because a
+       slide that moves while it is being read is a slide the reader has to
+       chase back. */
+    let hovering = false;
+    let focused = false;
+    let visible = true;
+
+    const sync = () => {
+      slider.classList.toggle("is-paused", hovering || focused || !visible || document.hidden);
+    };
+
+    slider.addEventListener("pointerenter", () => {
+      hovering = true;
+      sync();
+    });
+    slider.addEventListener("pointerleave", () => {
+      hovering = false;
+      sync();
+    });
+    slider.addEventListener("focusin", () => {
+      focused = true;
+      sync();
+    });
+    slider.addEventListener("focusout", (event) => {
+      if (slider.contains(event.relatedTarget as Node)) return;
+      focused = false;
+      sync();
+    });
+    document.addEventListener("visibilitychange", sync);
+
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(
+        ([entry]) => {
+          visible = entry.isIntersecting;
+          sync();
+        },
+        { threshold: 0.35 },
+      ).observe(slider);
+    }
+
+    paint();
+    track.addEventListener("scroll", paint, { passive: true });
+    window.addEventListener("resize", paint);
+  });
+</script>
